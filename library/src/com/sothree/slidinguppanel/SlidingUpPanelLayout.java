@@ -23,8 +23,8 @@ import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
 
-import com.nineoldandroids.view.animation.AnimatorProxy;
 import com.sothree.slidinguppanel.library.R;
+import com.nineoldandroids.view.animation.AnimatorProxy;
 
 public class SlidingUpPanelLayout extends ViewGroup {
 
@@ -136,6 +136,15 @@ public class SlidingUpPanelLayout extends ViewGroup {
      * The main view
      */
     private View mMainView;
+
+    /**
+     * Scrollable container
+     */
+    private ViewGroup mScrollableView;
+    /**
+     *
+     */
+    private int mScrollableViewTopPadding;
 
     /**
      * Current state of the slideable view.
@@ -255,14 +264,14 @@ public class SlidingUpPanelLayout extends ViewGroup {
 
     public SlidingUpPanelLayout(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        
+
         if(isInEditMode()) {
             mShadowDrawable = null;
             mScrollTouchSlop = 0;
             mDragHelper = null;
             return;
         }
-        
+
         if (attrs != null) {
             TypedArray defAttrs = context.obtainStyledAttributes(attrs, DEFAULT_ATTRS);
 
@@ -629,7 +638,7 @@ public class SlidingUpPanelLayout extends ViewGroup {
             final int childHeight = child.getMeasuredHeight();
 
             if (lp.slideable) {
-                mSlideRange = childHeight - mPanelHeight;
+                mSlideRange = childHeight - (mPanelHeight + mScrollableViewTopPadding);
             }
 
             int childTop;
@@ -637,9 +646,7 @@ public class SlidingUpPanelLayout extends ViewGroup {
                 childTop = lp.slideable ? slidingTop + (int) (mSlideRange * mSlideOffset) : paddingTop;
             } else {
                 childTop = lp.slideable ? slidingTop - (int) (mSlideRange * mSlideOffset) : paddingTop;
-                if (!lp.slideable && !mOverlayContent) {
-                    childTop += mPanelHeight;
-                }
+
             }
             final int childBottom = childTop + childHeight;
             final int childLeft = paddingLeft;
@@ -720,7 +727,11 @@ public class SlidingUpPanelLayout extends ViewGroup {
                     }
                 }
 
-                if ((ady > dragSlop && adx > ady) || !isDragViewUnder((int) x, (int) y)) {
+                // check if scroll down or scroll up and ListView is in top position
+                boolean isCanScrollUp = mSlideOffset == 0 && (y < mInitialMotionY ||
+                        (mScrollableView != null && mScrollableView.getChildAt(0) != null &&
+                                mScrollableView.getChildAt(0).getTop() != 0));
+                if (isCanScrollUp || (ady > dragSlop && adx > ady) || !isDragViewUnder((int) x, (int) y)) {
                     mDragHelper.cancel();
                     mIsUnableToDrag = true;
                     return false;
@@ -751,7 +762,7 @@ public class SlidingUpPanelLayout extends ViewGroup {
                 final float y = ev.getY();
                 mInitialMotionX = x;
                 mInitialMotionY = y;
-                break;
+                return isDragViewUnder((int) x, (int) y);
             }
 
             case MotionEvent.ACTION_UP: {
@@ -788,7 +799,7 @@ public class SlidingUpPanelLayout extends ViewGroup {
         int screenX = parentLocation[0] + x;
         int screenY = parentLocation[1] + y;
         return screenX >= viewLocation[0] && screenX < viewLocation[0] + dragView.getWidth() &&
-                screenY >= viewLocation[1] && screenY < viewLocation[1] + dragView.getHeight();
+                (screenY >= viewLocation[1] + mScrollableViewTopPadding) && screenY < viewLocation[1] + dragView.getHeight();
     }
 
     private boolean expandPane(View pane, int initialVelocity, float mSlideOffset) {
@@ -914,6 +925,9 @@ public class SlidingUpPanelLayout extends ViewGroup {
 
     @Override
     protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
+        if (mScrollableView != null) {
+            return super.drawChild(canvas, child, drawingTime);
+        }
         final LayoutParams lp = (LayoutParams) child.getLayoutParams();
         boolean result;
         final int save = canvas.save(Canvas.CLIP_SAVE_FLAG);
@@ -1267,5 +1281,11 @@ public class SlidingUpPanelLayout extends ViewGroup {
                 return new SavedState[size];
             }
         };
+    }
+
+    public void setScrollableView(ViewGroup scrollableView, int topPadding) {
+        mScrollableView = scrollableView;
+        mScrollableViewTopPadding = topPadding;
+        mSlideState = SlideState.EXPANDED;
     }
 }
