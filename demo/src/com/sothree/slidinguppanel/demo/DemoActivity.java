@@ -20,6 +20,7 @@ import android.view.View.OnClickListener;
 import android.view.Window;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class DemoActivity extends Activity {
     private static final String TAG = "DemoActivity";
@@ -45,19 +46,31 @@ public class DemoActivity extends Activity {
             @Override
             public void onPanelExpanded(View panel) {
                 Log.i(TAG, "onPanelExpanded");
+                Toast.makeText(DemoActivity.this, "Panel expanded", Toast
+                        .LENGTH_SHORT).show();
 
             }
 
             @Override
             public void onPanelCollapsed(View panel) {
                 Log.i(TAG, "onPanelCollapsed");
+                Toast.makeText(DemoActivity.this, "Panel collapsed", Toast
+                        .LENGTH_SHORT).show();
 
             }
 
             @Override
             public void onPanelAnchored(View panel) {
                 Log.i(TAG, "onPanelAnchored");
+                Toast.makeText(DemoActivity.this, "Panel anchored", Toast
+                        .LENGTH_SHORT).show();
 
+            }
+
+            @Override
+            public void onPanelSet(View panel, float slideOffset) {
+                Toast.makeText(DemoActivity.this, "Panel set to slideOffset " + slideOffset, Toast
+                        .LENGTH_SHORT).show();
             }
         });
 
@@ -73,6 +86,20 @@ public class DemoActivity extends Activity {
 
         t = (TextView) findViewById(R.id.name);
         t.setText(Html.fromHtml(getString(R.string.hello)));
+
+        Button customDragButton = (Button) findViewById(R.id.try_custom_drag);
+        customDragButton.setText(Html.fromHtml(getString(R.string.toggle_custom_drag)));
+        customDragButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (mLayout.getSlideMode() == SlidingUpPanelLayout.SlideMode.DEFAULT_DRAG) {
+                    mLayout.setSlideMode(SlidingUpPanelLayout.SlideMode.CUSTOM_DRAG);
+                } else {
+                    mLayout.setSlideMode(SlidingUpPanelLayout.SlideMode.DEFAULT_DRAG);
+                }
+            }
+        });
+
         Button f = (Button) findViewById(R.id.follow);
         f.setText(Html.fromHtml(getString(R.string.follow)));
         f.setMovementMethod(LinkMovementMethod.getInstance());

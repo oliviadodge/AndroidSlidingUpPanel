@@ -672,6 +672,9 @@ public class SlidingUpPanelLayout extends ViewGroup {
             case ANCHORED:
                 mSlideOffset = mCanSlide ? mAnchorPoint : 1.f;
                 break;
+            case SET:
+                //Nothing to do here since mSlideOffset should already be saved
+                break;
             default:
                 mSlideOffset = 1.f;
                 break;
@@ -1195,7 +1198,6 @@ public class SlidingUpPanelLayout extends ViewGroup {
                     mSlideState = SlideState.COLLAPSED;
                 } else if (mSlideState != SlideState.SET) {
                     updateObscuredViewVisibility();
-                    dispatchOnPanelSet(mSlideableView);
                     mSlideState = SlideState.SET;
                 }
             }
@@ -1242,6 +1244,9 @@ public class SlidingUpPanelLayout extends ViewGroup {
                 }
             } else {
                 top = releasedChild.getTop();
+                if (mSlideOffset != 0.f && mSlideOffset != 1.f) {
+                    dispatchOnPanelSet(mSlideableView);
+                }
             }
 
             mDragHelper.settleCapturedViewAt(releasedChild.getLeft(), top);

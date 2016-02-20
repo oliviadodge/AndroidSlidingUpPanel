@@ -54,6 +54,14 @@
                     android:paddingLeft="10dp"/>
 
 				<Button
+                    android:id="@+id/try_custom_drag"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:textSize="14sp"
+                    android:gravity="center_vertical"
+                    android:paddingRight="10dp"
+                    android:paddingLeft="10dp"/>
+				<Button
                     android:id="@+id/follow"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
