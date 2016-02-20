@@ -147,12 +147,22 @@ public class SlidingUpPanelLayout extends ViewGroup {
     private int mScrollableViewTopPadding;
 
     /**
+     * Sliding panel mode
+     */
+    public enum SlideMode {
+        DEFAULT_DRAG,
+        CUSTOM_DRAG
+    }
+    private SlideMode mSlideMode = SlideMode.DEFAULT_DRAG;
+
+    /**
      * Current state of the slideable view.
      */
     private enum SlideState {
         EXPANDED,
         COLLAPSED,
-        ANCHORED
+        ANCHORED,
+        SET
     }
     private SlideState mSlideState = SlideState.COLLAPSED;
 
@@ -233,6 +243,14 @@ public class SlidingUpPanelLayout extends ViewGroup {
         public void onPanelExpanded(View panel);
 
         public void onPanelAnchored(View panel);
+
+        /**
+         * Called when a sliding pane's position is set.
+         * @param panel The child view that was moved
+         * @param slideOffset The new offset of this sliding pane within its range: 0 <
+         *                    {@param slideOffset} < 1
+         */
+        public void onPanelSet(View panel, float slideOffset);
     }
 
     /**
@@ -251,6 +269,9 @@ public class SlidingUpPanelLayout extends ViewGroup {
         }
         @Override
         public void onPanelAnchored(View panel) {
+        }
+        @Override
+        public void onPanelSet(View panel, float slideOffset) {
         }
     }
 
@@ -346,6 +367,29 @@ public class SlidingUpPanelLayout extends ViewGroup {
         if (mDragViewResId != -1) {
             mDragView = findViewById(mDragViewResId);
         }
+    }
+
+    /**
+     * Set the sliding mode used to determine how the pane reacts when released. Default mode
+     * means the pane will slide up or down to the anchor or fully collapsed/expanded state.
+     * Custom drag allows the user to drag the pane to the desired y location.
+     *
+     * @param slideMode One of two values: {@link com.sothree.slidinguppanel.SlidingUpPanelLayout
+     * .SlideMode.DEFAULT_DRAG} or {@link com.sothree.slidinguppanel.SlidingUpPanelLayout
+     * .SlideMode.CUSTOM_DRAG}
+     */
+    public void setSlideMode(SlideMode slideMode) {
+        mSlideMode = slideMode;
+        invalidate();
+    }
+
+    /**
+     * @return One of two values: {@link com.sothree.slidinguppanel.SlidingUpPanelLayout
+     * .SlideMode.DEFAULT_DRAG} or {@link com.sothree.slidinguppanel.SlidingUpPanelLayout
+     * .SlideMode.CUSTOM_DRAG}
+     */
+    public SlideMode getSlideMode() {
+        return mSlideMode;
     }
 
     /**
@@ -465,6 +509,13 @@ public class SlidingUpPanelLayout extends ViewGroup {
     void dispatchOnPanelAnchored(View panel) {
         if (mPanelSlideListener != null) {
             mPanelSlideListener.onPanelAnchored(panel);
+        }
+        sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
+    }
+
+    void dispatchOnPanelSet(View panel) {
+        if (mPanelSlideListener != null) {
+            mPanelSlideListener.onPanelSet(panel, mSlideOffset);
         }
         sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
     }
@@ -872,6 +923,15 @@ public class SlidingUpPanelLayout extends ViewGroup {
     }
 
     /**
+     * Check if the layout is set by user in an intermediate point.
+     *
+     * @return true if sliding panels is at a point set by user
+     */
+    public boolean isSet() {
+        return mSlideState == SlideState.SET;
+    }
+
+    /**
      * Check if the content in this layout cannot fully fit side by side and therefore
      * the content pane can be slid back and forth.
      *
@@ -1089,6 +1149,7 @@ public class SlidingUpPanelLayout extends ViewGroup {
 
         SavedState ss = new SavedState(superState);
         ss.mSlideState = mSlideState;
+        ss.mSlideOffset = mSlideOffset;
 
         return ss;
     }
@@ -1098,6 +1159,7 @@ public class SlidingUpPanelLayout extends ViewGroup {
         SavedState ss = (SavedState) state;
         super.onRestoreInstanceState(ss.getSuperState());
         mSlideState = ss.mSlideState;
+        mSlideOffset = ss.mSlideOffset;
     }
 
     private class DragHelperCallback extends ViewDragHelper.Callback {
@@ -1128,9 +1190,13 @@ public class SlidingUpPanelLayout extends ViewGroup {
                         dispatchOnPanelAnchored(mSlideableView);
                         mSlideState = SlideState.ANCHORED;
                     }
-                } else if (mSlideState != SlideState.COLLAPSED) {
+                } else if (mSlideOffset == 1.f && mSlideState != SlideState.COLLAPSED) {
                     dispatchOnPanelCollapsed(mSlideableView);
                     mSlideState = SlideState.COLLAPSED;
+                } else if (mSlideState != SlideState.SET) {
+                    updateObscuredViewVisibility();
+                    dispatchOnPanelSet(mSlideableView);
+                    mSlideState = SlideState.SET;
                 }
             }
         }
@@ -1152,17 +1218,17 @@ public class SlidingUpPanelLayout extends ViewGroup {
             int top = mIsSlidingUp
                     ? getSlidingTop()
                     : getSlidingTop() - mSlideRange;
-
-            if (mAnchorPoint != 0) {
-                int anchoredTop;
-                float anchorOffset;
-                if (mIsSlidingUp) {
-                    anchoredTop = (int)(mAnchorPoint*mSlideRange);
-                    anchorOffset = (float)anchoredTop/(float)mSlideRange;
-                } else {
-                    anchoredTop = mPanelHeight - (int)(mAnchorPoint*mSlideRange);
-                    anchorOffset = (float)(mPanelHeight - anchoredTop)/(float)mSlideRange;
-                }
+            if (Math.abs(yvel) >= mMinFlingVelocity || mSlideMode == SlideMode.DEFAULT_DRAG) {
+                if (mAnchorPoint != 0) {
+                    int anchoredTop;
+                    float anchorOffset;
+                    if (mIsSlidingUp) {
+                        anchoredTop = (int)(mAnchorPoint*mSlideRange);
+                        anchorOffset = (float)anchoredTop/(float)mSlideRange;
+                    } else {
+                        anchoredTop = mPanelHeight - (int)(mAnchorPoint*mSlideRange);
+                        anchorOffset = (float)(mPanelHeight - anchoredTop)/(float)mSlideRange;
+                    }
 
                 if (yvel > 0 || (yvel == 0 && mSlideOffset >= (1f+anchorOffset)/2)) {
                     top += mSlideRange;
@@ -1171,8 +1237,11 @@ public class SlidingUpPanelLayout extends ViewGroup {
                     top += mSlideRange * mAnchorPoint;
                 }
 
-            } else if (yvel > 0 || (yvel == 0 && mSlideOffset > 0.5f)) {
-                top += mSlideRange;
+                } else if (yvel > 0 || (yvel == 0 && mSlideOffset > 0.5f)) {
+                    top += mSlideRange;
+                }
+            } else {
+                top = releasedChild.getTop();
             }
 
             mDragHelper.settleCapturedViewAt(releasedChild.getLeft(), top);
@@ -1249,6 +1318,7 @@ public class SlidingUpPanelLayout extends ViewGroup {
 
     static class SavedState extends BaseSavedState {
         SlideState mSlideState;
+        float mSlideOffset;
 
         SavedState(Parcelable superState) {
             super(superState);
@@ -1258,8 +1328,10 @@ public class SlidingUpPanelLayout extends ViewGroup {
             super(in);
             try {
                 mSlideState = Enum.valueOf(SlideState.class, in.readString());
+                mSlideOffset = in.readFloat();
             } catch (IllegalArgumentException e) {
                 mSlideState = SlideState.COLLAPSED;
+                mSlideOffset = 1.f;
             }
         }
 
@@ -1267,6 +1339,7 @@ public class SlidingUpPanelLayout extends ViewGroup {
         public void writeToParcel(Parcel out, int flags) {
             super.writeToParcel(out, flags);
             out.writeString(mSlideState.toString());
+            out.writeFloat(mSlideOffset);
         }
 
         public static final Parcelable.Creator<SavedState> CREATOR =
